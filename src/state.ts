@@ -8,6 +8,8 @@ class StateManager {
   private state: AppState = {
     mappings: {},
     state: {},
+    archivedEvents: {},
+    shouldFetchNewCycleMap: false,
   };
 
   private constructor() {}
@@ -30,6 +32,10 @@ class StateManager {
    */
   public set(key: string, value: any): void {
     this.state[key] = value;
+  }
+
+  public setState(key: string, value: any): void {
+    this.state.state[key] = value;
   }
 
   /**
@@ -57,9 +63,6 @@ class StateManager {
     return { ...this.state };
   }
 
-  /**
-   * Clear the entire state
-   */
   public clear(): void {
     this.state = {
       mappings: {},
@@ -68,5 +71,4 @@ class StateManager {
   }
 }
 
-// Export a singleton instance
 export const stateManager = StateManager.getInstance();

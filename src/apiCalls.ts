@@ -1,5 +1,10 @@
 import { stateManager } from "./state";
-
+import { EventStatus, SportEvent } from "./types";
+import {
+  processMappings,
+  processEventData,
+  createSportEvent,
+} from "./utils/mappingUtils";
 export async function fetchMappings(): Promise<void> {
   try {
     const response = await fetch("http://localhost:3000/api/mappings");
@@ -7,14 +12,11 @@ export async function fetchMappings(): Promise<void> {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const mappings = await response.json();
-    const mappingsArray = mappings.mappings.split(";");
-    const mappingsObject = {};
-    mappingsArray.forEach((mapping) => {
-      const [value, key] = mapping.split(":");
-      mappingsObject[value] = key;
-    });
+
+    const mappingsObject = processMappings(mappings.mappings);
+
     stateManager.set("mappings", mappingsObject);
-    fetchState();
+    stateManager.set("shouldFetchNewCycleMap", false);
   } catch (error) {
     console.error("Error fetching mappings:", error);
   }
@@ -24,63 +26,38 @@ export async function fetchState(): Promise<void> {
   try {
     const response = await fetch("http://localhost:3000/api/state");
     if (!response.ok) {
+      console.log(response);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const state = await response.json();
 
     const mappedState = state.odds.split("\n");
+    const notIdEventsField = mappedState[0].split(",")[1];
     const mappingsObject = stateManager.get("mappings");
-    console.log("Mappings object:", JSON.stringify(mappingsObject, null, 2));
 
-    const processedEvents = mappedState.map((line) => {
-      const items = line.split(",");
+    const shouldFetchNewCycleMap =
+      mappingsObject[notIdEventsField] === undefined;
 
-      const mappedItems = items.map((item) => {
-        if (mappingsObject[item]) {
-          return mappingsObject[item];
-        }
+    if (shouldFetchNewCycleMap) {
+      stateManager.set("shouldFetchNewCycleMap", true);
+      const currentState = stateManager.get("state");
+      Object.values(currentState).forEach((event: SportEvent) => {
+        event.status = EventStatus.REMOVED;
       });
+      stateManager.set("state", {});
+      stateManager.set("archivedEvents", currentState);
+      await fetchMappings();
+      return;
+    }
 
-      if (mappedItems.length > 0) {
-        const lastItem = mappedItems[mappedItems.length - 1];
-        if (lastItem.includes("@") && lastItem.includes("|")) {
-          const oddsEntries = lastItem.split("|");
-          console.log("Odds entries:", JSON.stringify(oddsEntries, null, 2));
+    const processedEvents = mappedState.map((line) =>
+      processEventData(line, mappingsObject)
+    );
 
-          const processedOdds = oddsEntries.map((entry) => {
-            const [id, odds] = entry.split("@");
-            console.log("Processing odds:", mappingsObject[id], odds);
-
-            const mappedId = mappingsObject[id] || id;
-
-            // Only include CURRENT scores
-            if (mappingsObject[id].startsWith("CURRENT")) {
-              console.log("Processing CURRENT odds:", odds);
-              const [home, away] = odds.split(":");
-              return {
-                type: "CURRENT",
-                home: home,
-                away: away,
-              };
-            }
-          });
-
-          mappedItems.splice(mappedItems.length - 1, 1, ...processedOdds);
-        }
-      }
-
-      return mappedItems;
+    processedEvents.forEach((event) => {
+      const mappedEvent = createSportEvent(event);
+      stateManager.setState(mappedEvent.id, mappedEvent);
     });
-
-    console.log("Processed events:", JSON.stringify(processedEvents, null, 2));
-    const events = processedEvents.map((event) => {
-      return {
-        id: event[0],
-        status: event[6],
-      };
-    });
-    console.log("Formatted events:", JSON.stringify(events, null, 2));
-    stateManager.set("state", events);
   } catch (error) {
     console.error("Error fetching state:", error);
   }

@@ -22,10 +22,10 @@ export interface Competitor {
 /**
  * Represents a single event/match
  */
-export interface Event {
+export interface SportEvent {
   id: string;
-  status: string;
-  scores: {
+  status: EventStatus;
+  scores?: {
     CURRENT: Score;
   };
   startTime: string;
@@ -41,7 +41,7 @@ export interface Event {
  * Represents the state of all events
  */
 export interface EventsState {
-  [eventId: string]: Event;
+  [eventId: string]: SportEvent;
 }
 
 /**
@@ -58,4 +58,10 @@ export interface AppState {
   mappings: Mappings;
   state: EventsState;
   [key: string]: any;
+}
+
+export enum EventStatus {
+  REMOVED = "REMOVED",
+  ACTIVE = "ACTIVE",
+  COMPLETED = "COMPLETED",
 }
