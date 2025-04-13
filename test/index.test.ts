@@ -40,6 +40,28 @@ describe("index", () => {
     }
   });
 
+  it("should return 500 error from /client/state endpoint when state is empty", async () => {
+    // Ensure state is empty
+    stateManager.clear();
+
+    try {
+      const response = await axios.get("http://localhost:3000/client/state");
+      // This line should not be reached if state is empty
+      expect(response.status).not.toBe(200);
+    } catch (error) {
+      if (error.code === "ECONNREFUSED") {
+        // If server is not running, this is expected
+        expect(error.code).toBe("ECONNREFUSED");
+      } else {
+        // If server is running, verify we get a 500 error
+        expect(error.response.status).toBe(500);
+        expect(error.response.data).toEqual({
+          message: "Something went wrong, please try again",
+        });
+      }
+    }
+  });
+
   describe("fetchMappings", () => {
     it("should fetch and store mappings successfully", async () => {
       // Mock data

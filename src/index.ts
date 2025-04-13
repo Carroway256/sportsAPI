@@ -26,5 +26,11 @@ app.listen(4000, () => {
 });
 
 app.get("/client/state", (req, res) => {
+  const state = stateManager.get("state");
+  if (!state || Object.keys(state).length === 0) {
+    return res
+      .status(500)
+      .json({ message: "Something went wrong, please try again" });
+  }
   res.json(stateManager.get("state"));
 });
